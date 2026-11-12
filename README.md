@@ -39,3 +39,7 @@ nothing to match against, on YouTube only the AI label and link-less cards (e.g.
 
 - Channel cards in search results (only video cards are handled).
 - Flagged watch pages get a banner; the video is not prevented from playing.
+
+## License
+
+Code: [GPL-3.0](LICENSE). The AiSList data it downloads at runtime is CC BY-NC 4.0 and belongs to its contributors.
