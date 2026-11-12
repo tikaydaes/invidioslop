@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>InvidioSlop</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #fbfbfd; --fg: #1c1b1f; --muted: #6a6870; --line: #dddbe3; --field: #fff; --accent: #b3261e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #1d1c21; --fg: #ebe9f0; --muted: #a09da8; --line: #3a3840; --field: #2a2930; --accent: #f2867f; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; width: 340px; padding: 14px 16px 16px; background: var(--bg); color: var(--fg); font: 13px/1.45 system-ui, sans-serif; }
+  h1 { margin: 0 0 2px; font-size: 15px; }
+  h2 { margin: 16px 0 6px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  p { margin: 0; }
+  .muted { color: var(--muted); font-size: 12px; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 5px 0; }
+  .row > span small { display: block; color: var(--muted); font-size: 11px; }
+  select, textarea, button { font: inherit; color: inherit; background: var(--field); border: 1px solid var(--line); border-radius: 6px; }
+  select { padding: 3px 6px; }
+  button { padding: 4px 10px; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  textarea { width: 100%; min-height: 54px; padding: 6px; resize: vertical; font-family: ui-monospace, monospace; font-size: 12px; }
+  label.block { display: block; margin-top: 8px; }
+  #page { padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); }
+  #error { color: var(--accent); }
+  a { color: inherit; }
+</style>
+</head>
+<body>
+  <h1>InvidioSlop</h1>
+  <p class="muted">AI slop filter for YouTube and Invidious</p>
+
+  <h2>This page</h2>
+  <div id="page">
+    <p id="page-text">Not a YouTube or Invidious page.</p>
+    <label class="row" id="reveal-row" hidden>
+      <span>Show hidden videos on this page</span>
+      <input type="checkbox" id="reveal">
+    </label>
+  </div>
+
+  <h2>What to do with…</h2>
+  <label class="row"><span>Blocklisted channels<small>AiSList, high confidence</small></span>
+    <select data-key="block"><option value="hide">Hide</option><option value="mark">Mark</option><option value="off">Ignore</option></select></label>
+  <label class="row"><span>Warnlisted channels<small>AiSList, medium confidence</small></span>
+    <select data-key="warn"><option value="hide">Hide</option><option value="mark">Mark</option><option value="off">Ignore</option></select></label>
+  <label class="row"><span>Videos YouTube labels as AI<small>“Altered or synthetic content” disclosure</small></span>
+    <select data-key="ai"><option value="hide">Hide</option><option value="mark">Mark</option><option value="off">Ignore</option></select></label>
+  <label class="row"><span>Look things up on youtube.com<small>Needed for the AI label, and for channel handles on Invidious</small></span>
+    <input type="checkbox" data-key="net"></label>
+
+  <h2>Your own lists</h2>
+  <label class="block">Never flag these channels
+    <textarea data-key="allow" placeholder="@handle, one per line" spellcheck="false"></textarea></label>
+  <label class="block">Always block these channels
+    <textarea data-key="extra" placeholder="@handle, one per line" spellcheck="false"></textarea></label>
+
+  <h2>AiSList</h2>
+  <div class="row">
+    <span id="list-text">Loading…</span>
+    <button id="sync" type="button">Sync now</button>
+  </div>
+  <p id="error" class="muted"></p>
+  <p class="muted">List data © <a href="https://github.com/Override92/AiSList" target="_blank" rel="noreferrer">AiSList</a> contributors, CC BY-NC 4.0.</p>
+
+  <script src="common.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

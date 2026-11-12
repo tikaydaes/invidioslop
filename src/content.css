@@ -1,0 +1,77 @@
+/* InvidioSlop — only ever matches elements the content script has tagged. */
+
+html:not([data-invslop-reveal]) [data-invslop-action="hide"] {
+  display: none !important;
+}
+
+[data-invslop] {
+  position: relative !important;
+}
+
+[data-invslop] img,
+[data-invslop] video {
+  filter: saturate(0.35) !important;
+}
+
+[data-invslop] a,
+[data-invslop] p,
+[data-invslop] h3,
+[data-invslop] span {
+  opacity: 0.6;
+}
+
+[data-invslop] > .invslop-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 60;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: #b3261e;
+  color: #fff;
+  font: 700 11px/1.4 system-ui, sans-serif;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: help;
+  opacity: 1;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+[data-invslop="warn"] > .invslop-badge { background: #9a5b00; }
+[data-invslop="ai"] > .invslop-badge { background: #5b3fc4; }
+
+.invslop-banner {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2147483000;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(92vw, 720px);
+  padding: 9px 10px 9px 16px;
+  border-radius: 8px;
+  background: #b3261e;
+  color: #fff;
+  font: 600 13px/1.4 system-ui, sans-serif;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+}
+
+.invslop-banner[data-invslop-kind="warn"] { background: #9a5b00; }
+.invslop-banner[data-invslop-kind="ai"] { background: #5b3fc4; }
+
+.invslop-banner button {
+  all: unset;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  text-align: center;
+  font: 400 18px/24px system-ui, sans-serif;
+  color: #fff;
+  cursor: pointer;
+}
+
+.invslop-banner button:hover { background: rgba(255, 255, 255, 0.2); }

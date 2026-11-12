@@ -1,0 +1,58 @@
+{
+  "manifest_version": 3,
+  "name": "InvidioSlop",
+  "version": "0.1.0",
+  "description": "Hides or marks AI slop on YouTube and Invidious using the community AiSList and YouTube's own AI-content label.",
+  "icons": {
+    "48": "icons/icon.svg",
+    "96": "icons/icon.svg"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "invidioslop@tikaydaes",
+      "strict_min_version": "128.0",
+      "data_collection_permissions": {
+        "required": [
+          "browsingActivity"
+        ]
+      }
+    }
+  },
+  "permissions": [
+    "storage",
+    "unlimitedStorage",
+    "alarms",
+    "webRequest",
+    "webRequestBlocking"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "scripts": [
+      "src/common.js",
+      "src/background.js"
+    ]
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "src/common.js",
+        "src/content.js"
+      ],
+      "css": [
+        "src/content.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "InvidioSlop",
+    "default_icon": "icons/icon.svg",
+    "default_popup": "src/popup.html"
+  }
+}
