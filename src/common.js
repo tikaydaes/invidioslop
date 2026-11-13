@@ -5,7 +5,10 @@ const SLOP_DEFAULTS = Object.freeze({
   block: 'hide', // channels on the AiSList blocklist: 'hide' | 'mark' | 'off'
   warn: 'mark',  // channels on the AiSList warnlist
   ai: 'mark',    // videos YouTube itself labels as altered / AI-generated
+  svc: 'mark',   // videos / channels listed by the community service
   net: true,     // allow lookups against youtube.com (channel handles, AI label)
+  contribute: true, // share channel-handle lookups and allow reporting; off = only download the list
+  svcUrl: 'https://aislop.tikaydaes.dev',
   allow: '',     // user list: channels that are never flagged (one per line)
   extra: '',     // user list: additional channels to block (one per line)
 });

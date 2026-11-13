@@ -5,18 +5,32 @@ Firefox extension that hides or marks AI slop on YouTube and on any Invidious in
 A video is flagged when:
 
 - its channel is on the [AiSList](https://github.com/Override92/AiSList) **blocklist** (default: hidden),
+- it, or its channel, is listed by **community reports** from users of this extension (default: marked),
 - its channel is on the AiSList **warnlist** (default: marked),
 - YouTube itself discloses it as altered / AI-generated — the "How this was made" label (default: marked).
 
-Each of the three can be set to Hide, Mark or Ignore from the toolbar popup, which also has your own
+Each of these can be set to Hide, Mark or Ignore from the toolbar popup, which also has your own
 allow/block lists, a "show hidden videos on this page" toggle and a manual list sync.
 
 Right-clicking a video (or anywhere on a watch or channel page) adds an InvidioSlop menu:
 
+- **Report or rate as AI slop…** — tell the community service what is AI in this video (voice, visuals, script,
+  music) and how much, or say it is not slop. Needs a community account.
 - **Block / Unblock @channel** — adds the channel to your own block list, or lifts a block. Unblocking a
   channel that AiSList flags puts it on your never-flag list. Everything stays local to your browser.
 - **Copy handle** — copies the channel's `@handle`.
 - **Show hidden videos on this page** — toggles hidden videos on and off.
+
+## Community reports
+
+Reports go to [aislop.tikaydaes.dev](https://aislop.tikaydaes.dev) ([source](https://github.com/tikaydaes/aislop-server)),
+where they are weighed by each reporter's reputation; a video is listed once enough independent people agree.
+
+- **Downloading the list needs no account** and sends nothing about you: the whole list is fetched, then small updates.
+- **Reporting needs an account**, which is a passkey and a nickname: no email, no password. Sign in from the popup.
+- **Channel handles are shared.** The extension asks the service which `@handle` belongs to a channel ID before
+  asking YouTube, and passes on answers it gets from YouTube. A small random share of answers is re-checked.
+- **"Contribute to community reports" off** stops all of that: the extension then only downloads the list.
 
 ## Install
 

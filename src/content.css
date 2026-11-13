@@ -40,6 +40,7 @@ html:not([data-invslop-reveal]) [data-invslop-action="hide"] {
 
 [data-invslop="warn"] > .invslop-badge { background: #9a5b00; }
 [data-invslop="ai"] > .invslop-badge { background: #5b3fc4; }
+[data-invslop="svc"] > .invslop-badge { background: #00695c; }
 
 .invslop-banner {
   position: fixed;
@@ -61,6 +62,7 @@ html:not([data-invslop-reveal]) [data-invslop-action="hide"] {
 
 .invslop-banner[data-invslop-kind="warn"] { background: #9a5b00; }
 .invslop-banner[data-invslop-kind="ai"] { background: #5b3fc4; }
+.invslop-banner[data-invslop-kind="svc"] { background: #00695c; }
 
 .invslop-banner button {
   all: unset;

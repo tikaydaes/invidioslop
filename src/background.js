@@ -1,5 +1,6 @@
 'use strict';
 /* global browser, slopGetSettings, slopNormHandle, slopParseList */
+/* global svcLoad, svcVerdict, svcQueueClaim, channelHandle, svcVideoState, svcToken -- from service.js */
 
 const LIST_BASE = 'https://raw.githubusercontent.com/Override92/AiSList/main/AiSList/';
 const LIST_URLS = {
@@ -228,7 +229,10 @@ function netVideo(v) {
     const uc = /^UC[\w-]{22}$/.test(be.browseId || '') ? be.browseId : '';
     const h = handleFromPath(be.canonicalBaseUrl);
     cacheSet('v:' + v, { ai, label, h, uc });
-    if (uc) cacheSet('c:' + uc, { h });
+    if (uc) {
+      cacheSet('c:' + uc, { h });
+      svcQueueClaim(uc, h, textOf(owner?.title));
+    }
   });
 }
 
@@ -236,7 +240,9 @@ function netChannel(uc) {
   return once('c:' + uc, async () => {
     const data = await innertube('browse', { browseId: uc });
     const md = data.metadata?.channelMetadataRenderer || {};
-    cacheSet('c:' + uc, { h: handleFromPath(md.vanityChannelUrl) });
+    const h = handleFromPath(md.vanityChannelUrl);
+    cacheSet('c:' + uc, { h });
+    svcQueueClaim(uc, h, md.title);
   });
 }
 
@@ -252,14 +258,15 @@ function listVerdict(lists, h, uc) {
 }
 
 // item: { v?: videoId, h?: '@handle', uc?: 'UC…' }
-// → { s: ''|'block'|'warn'|'ai', why, pending }
+// → { s: ''|'block'|'svc'|'ai'|'warn', why, pending }
 async function evaluate(item, allowNet) {
-  const [st, lists] = await Promise.all([getSettings(), getLists()]);
+  const [st, lists, svc] = await Promise.all([getSettings(), getLists(), svcLoad()]);
   const v = /^[\w-]{11}$/.test(item.v || '') ? item.v : '';
   let uc = /^UC[\w-]{22}$/.test(item.uc || '') ? item.uc : '';
   let h = slopNormHandle(item.h);
   let vc = null;
   let lv = '';
+  let sv = ''; // why the community service lists it, if it does
 
   const settle = async () => {
     await cacheLoad([v && 'v:' + v]);
@@ -270,27 +277,32 @@ async function evaluate(item, allowNet) {
     await cacheLoad([uc && 'c:' + uc]);
     if (!h && uc) h = mem.get('c:' + uc)?.h || '';
     lv = listVerdict(lists, h, uc);
+    sv = st.svc !== 'off' ? svcVerdict(svc, v, h, uc) : '';
   };
   await settle();
 
   const wantAi = st.ai !== 'off' && !!v;
-  const decided = lv === 'allow' || lv === 'block' || lv === 'extra';
-  const needAi = wantAi && !vc;
-  const needHandle = !h && !vc && (v || (uc && !mem.has('c:' + uc)));
+  const decided = lv === 'allow' || lv === 'block' || lv === 'extra' || !!sv;
+  const needAi = wantAi && !vc && st.net;
+  // The channel is unknown until we have a handle or have looked and found none.
+  const chanKnown = !!h || !!vc || (!!uc && mem.has('c:' + uc));
+  const canFindChan = uc ? (st.net || st.contribute) : (!!v && st.net);
   let pending = false;
 
-  if (!decided && st.net && (needAi || needHandle)) {
+  if (!decided && (needAi || (!chanKnown && canFindChan))) {
     if (!allowNet) {
       pending = true;
     } else {
       try {
-        if (v && (needAi || !uc)) await netVideo(v);
-        else await netChannel(uc);
+        if (v && needAi) await netVideo(v);       // also tells us the channel
+        else if (uc) await channelHandle(uc);     // community service first, then YouTube
+        else await netVideo(v);
       } catch (e) {
         console.warn('[InvidioSlop]', e.message || e);
         // Remember the failure for this session so a broken lookup isn't retried per card.
-        if (v && !mem.has('v:' + v)) cacheSet('v:' + v, { ai: 0, label: '', h: '', uc: '' }, false);
+        if (v && needAi && !mem.has('v:' + v)) cacheSet('v:' + v, { ai: 0, label: '', h: '', uc: '' }, false);
         else if (uc && !mem.has('c:' + uc)) cacheSet('c:' + uc, { h: '' }, false);
+        else if (v && !mem.has('v:' + v)) cacheSet('v:' + v, { ai: 0, label: '', h: '', uc: '' }, false);
       }
       await settle();
     }
@@ -300,6 +312,7 @@ async function evaluate(item, allowNet) {
   if (lv === 'allow') return { s: '', why: '', pending: false };
   if (lv === 'extra') return { s: 'block', why: `${who} is on your own block list`, pending: false };
   if (lv === 'block') return { s: 'block', why: `${who} is on the AiSList blocklist`, pending: false };
+  if (sv) return { s: 'svc', why: sv, pending: false };
   if (wantAi && vc?.ai) return { s: 'ai', why: `YouTube label: ${vc.label || 'altered or synthetic content'}`, pending: false };
   if (lv === 'warn' && st.warn !== 'off') return { s: 'warn', why: `${who} is on the AiSList warnlist (likely AI content)`, pending };
   return { s: '', why: '', pending };
@@ -308,11 +321,12 @@ async function evaluate(item, allowNet) {
 // ------------------------------------------------------ right-click menu
 
 const MENU_CONTEXTS = ['page', 'link', 'image', 'video', 'selection'];
-const MENU_IDS = ['slop-block', 'slop-copy', 'slop-sep', 'slop-reveal'];
+const MENU_IDS = ['slop-report', 'slop-block', 'slop-copy', 'slop-sep', 'slop-reveal'];
 
 function createMenus() {
   browser.menus.removeAll().then(() => {
     const base = { contexts: MENU_CONTEXTS, visible: false };
+    browser.menus.create({ ...base, id: 'slop-report', title: 'Report or rate as AI slop…' });
     browser.menus.create({ ...base, id: 'slop-block', title: 'Block this channel' });
     browser.menus.create({ ...base, id: 'slop-copy', title: 'Copy channel handle' });
     browser.menus.create({ ...base, id: 'slop-sep', type: 'separator' });
@@ -333,9 +347,12 @@ async function identify(item, allowNet) {
     if (!h && uc) h = mem.get('c:' + uc)?.h || '';
   };
   await fill();
-  if (!h && allowNet && (uc || v) && (await getSettings()).net) {
+  const known = !!h || (!!uc && mem.has('c:' + uc));
+  if (!known && allowNet && (uc || v)) {
+    const st = await getSettings();
     try {
-      if (uc) await netChannel(uc); else await netVideo(v);
+      if (uc && (st.net || st.contribute)) await channelHandle(uc);
+      else if (v && st.net) await netVideo(v);
     } catch (e) { console.warn('[InvidioSlop]', e.message || e); }
     await fill();
   }
@@ -387,13 +404,15 @@ browser.menus.onShown.addListener(async (info, tab) => {
   } else {
     let id = { h: '', uc: '' };
     let blocked = false;
+    const st = await getSettings();
     if (ctx.item) {
-      const [st, lists] = await Promise.all([getSettings(), getLists()]);
+      const lists = await getLists();
       id = await identify(ctx.item, false);
       blocked = blockState(id, st, lists.allow, lists.extra, lists).blocked;
     }
     const who = id.h || 'this channel';
     updates = [
+      ['slop-report', { visible: !!ctx.item?.v && st.contribute }],
       ['slop-block', { visible: !!ctx.item, title: `${blocked ? 'Unblock' : 'Block'} ${who}` }],
       ['slop-copy', { visible: !!ctx.item, title: id.h ? `Copy handle ${id.h}` : 'Copy channel handle' }],
       ['slop-sep', { visible: !!ctx.item }],
@@ -416,6 +435,10 @@ browser.menus.onClicked.addListener(async (info, tab) => {
   if (!ctx) return;
   if (info.menuItemId === 'slop-reveal') {
     browser.tabs.sendMessage(tab.id, { type: 'reveal', on: !ctx.reveal }, { frameId: 0 }).catch(() => {});
+  } else if (info.menuItemId === 'slop-report' && ctx.item?.v) {
+    // The page shows the dialog; fetch where the video stands for it.
+    const [state, token] = await Promise.all([svcVideoState(ctx.item.v).catch(() => null), svcToken()]);
+    browser.tabs.sendMessage(tab.id, { type: 'report-open', item: ctx.item, state, signedIn: !!token }, { frameId: 0 }).catch(() => {});
   } else if (info.menuItemId === 'slop-block' && ctx.item) {
     await toggleBlock(ctx.item);
   } else if (info.menuItemId === 'slop-copy' && ctx.item) {

@@ -46,12 +46,24 @@
   <h2>What to do with…</h2>
   <label class="row"><span>Blocklisted channels<small>AiSList, high confidence</small></span>
     <select data-key="block"><option value="hide">Hide</option><option value="mark">Mark</option><option value="off">Ignore</option></select></label>
+  <label class="row"><span>Community reports<small>Videos and channels reported by users of this extension</small></span>
+    <select data-key="svc"><option value="hide">Hide</option><option value="mark">Mark</option><option value="off">Ignore</option></select></label>
   <label class="row"><span>Warnlisted channels<small>AiSList, medium confidence</small></span>
     <select data-key="warn"><option value="hide">Hide</option><option value="mark">Mark</option><option value="off">Ignore</option></select></label>
   <label class="row"><span>Videos YouTube labels as AI<small>“Altered or synthetic content” disclosure</small></span>
     <select data-key="ai"><option value="hide">Hide</option><option value="mark">Mark</option><option value="off">Ignore</option></select></label>
   <label class="row"><span>Look things up on youtube.com<small>Needed for the AI label, and for channel handles on Invidious</small></span>
     <input type="checkbox" data-key="net"></label>
+
+  <label class="row"><span>Contribute to community reports<small>Shares channel-handle lookups and lets you report videos. Off = only download the list; nothing is sent.</small></span>
+    <input type="checkbox" data-key="contribute"></label>
+
+  <h2>Community account</h2>
+  <div class="row">
+    <span id="svc-user">Checking…</span>
+    <button id="svc-auth" type="button" hidden></button>
+  </div>
+  <p class="muted" id="svc-text"></p>
 
   <h2>Your own lists</h2>
   <label class="block">Never flag these channels

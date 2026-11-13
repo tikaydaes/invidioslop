@@ -20,7 +20,7 @@
   ].join(',');
   const NEVER_INSIDE = '#movie_player, .html5-video-player, #player, #player-container, .invslop-banner';
   const CLIMB_STOP = '.pure-g, main, [role="main"], #contents, #content, #items, ytd-app';
-  const BADGE_TEXT = { block: 'AI slop', warn: 'Likely AI', ai: 'AI-labelled' };
+  const BADGE_TEXT = { block: 'AI slop', svc: 'Reported AI', warn: 'Likely AI', ai: 'AI-labelled' };
 
   let settings = null;
   let state = new WeakMap(); // card → { key, item }
@@ -225,7 +225,7 @@
   }
 
   browser.storage.onChanged.addListener(async (changes, area) => {
-    if (area !== 'local' || !(changes.settings || changes.listMeta)) return;
+    if (area !== 'local' || !(changes.settings || changes.listMeta || changes.svcMeta)) return;
     settings = await slopGetSettings();
     resetAll();
   });
@@ -246,7 +246,124 @@
     return v ? { v } : channelOf(u);
   }
 
+  // ------------------------------------------------------ report dialog
+  // Lives in a shadow root so the site's CSS and ours cannot interfere.
+  const TYPES = [['voice', 'AI voice / narration'], ['visual', 'AI visuals'], ['script', 'AI-written script'], ['music', 'AI music']];
+  const LEVELS = [[1, 'Some AI'], [2, 'Mostly AI'], [3, 'Pure slop']];
+  const DIALOG_CSS = `
+    :host { all: initial; }
+    .veil { position: fixed; inset: 0; z-index: 2147483600; display: grid; place-items: center; background: rgba(0,0,0,.55); font: 14px/1.45 system-ui, sans-serif; }
+    form { box-sizing: border-box; width: min(92vw, 380px); max-height: 92vh; overflow: auto; padding: 18px; border-radius: 12px; background: #fbfbfd; color: #1c1b1f; box-shadow: 0 10px 40px rgba(0,0,0,.5); }
+    @media (prefers-color-scheme: dark) { form { background: #222126; color: #ebe9f0; } }
+    h2 { margin: 0 0 4px; font-size: 16px; }
+    p { margin: 0 0 10px; opacity: .8; font-size: 13px; }
+    fieldset { margin: 0 0 12px; padding: 0; border: 0; }
+    legend { padding: 0; margin-bottom: 4px; font-weight: 600; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; opacity: .7; }
+    label { display: flex; align-items: center; gap: 8px; padding: 3px 0; cursor: pointer; }
+    input { margin: 0; }
+    .row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+    button { font: inherit; font-weight: 600; padding: 7px 12px; border-radius: 6px; border: 1px solid #b3261e; background: #b3261e; color: #fff; cursor: pointer; }
+    button.plain { background: transparent; color: inherit; border-color: rgba(128,128,128,.5); }
+    button:disabled { opacity: .5; cursor: default; }
+    .msg { min-height: 1.4em; margin: 10px 0 0; font-weight: 600; }
+  `;
+
+  function el(tag, props, ...kids) {
+    const node = Object.assign(document.createElement(tag), props || {});
+    node.append(...kids);
+    return node;
+  }
+
+  function closeReport() {
+    document.querySelector('.invslop-report')?.remove();
+  }
+
+  function describeState(state) {
+    if (!state || state.status === 'unknown') return 'Nobody has reported this video yet.';
+    const votes = `${state.n_yes} say slop, ${state.n_no} say not`;
+    if (state.status === 'confirmed') return `Listed as AI slop (${votes}).`;
+    if (state.status === 'rejected') return `Reviewed and not listed (${votes}).`;
+    return `Reported, not settled yet (${votes}).`;
+  }
+
+  function openReport({ item, state, signedIn }) {
+    closeReport();
+    const host = el('div', { className: 'invslop-report' });
+    const root = host.attachShadow({ mode: 'open' });
+    const msg = el('p', { className: 'msg' });
+    msg.setAttribute('role', 'status');
+    const status = el('p', {}, describeState(state));
+    const mine = state?.mine;
+
+    const typeBoxes = TYPES.map(([value, text]) => {
+      const box = el('input', { type: 'checkbox', value, checked: !!mine?.slop && mine.types.includes(value) });
+      return [box, el('label', {}, box, text)];
+    });
+    const levelBoxes = LEVELS.map(([value, text]) => {
+      const box = el('input', { type: 'radio', name: 'level', value: String(value), checked: (mine?.slop ? mine.level : 2) === value });
+      return [box, el('label', {}, box, text)];
+    });
+
+    const slopBtn = el('button', { type: 'button' }, mine?.slop ? 'Update my report' : 'Report as AI slop');
+    const notBtn = el('button', { type: 'button', className: 'plain' }, 'Not slop');
+    const cancel = el('button', { type: 'button', className: 'plain' }, 'Close');
+    const signIn = el('button', { type: 'button' }, 'Sign in to report');
+    const actions = el('div', { className: 'row' });
+
+    const setSignedIn = (yes) => {
+      actions.replaceChildren(...(yes ? [slopBtn, notBtn, cancel] : [signIn, cancel]));
+    };
+    setSignedIn(signedIn);
+
+    const busy = (on) => { for (const b of [slopBtn, notBtn, signIn]) b.disabled = on; };
+    const send = async (message) => {
+      busy(true);
+      try {
+        const res = await browser.runtime.sendMessage(message);
+        if (!res?.ok) throw new Error(res?.error || 'Something went wrong.');
+        return res.value;
+      } finally { busy(false); }
+    };
+
+    const submit = async (slop) => {
+      const types = typeBoxes.filter(([box]) => box.checked).map(([box]) => box.value);
+      const level = Number(levelBoxes.find(([box]) => box.checked)?.[0].value || 0);
+      if (slop && !types.length) { msg.textContent = 'Tick at least one kind of AI content.'; return; }
+      msg.textContent = 'Sending…';
+      try {
+        const next = await send({ type: 'svc-assess', item, slop, types, level });
+        status.textContent = describeState(next);
+        msg.textContent = 'Recorded. Thank you.';
+      } catch (e) { msg.textContent = e.message; }
+    };
+    slopBtn.addEventListener('click', () => submit(true));
+    notBtn.addEventListener('click', () => submit(false));
+    cancel.addEventListener('click', closeReport);
+    signIn.addEventListener('click', async () => {
+      msg.textContent = 'Complete sign-in in the window that opened…';
+      try { await send({ type: 'svc-login' }); msg.textContent = ''; setSignedIn(true); } catch (e) { msg.textContent = e.message; }
+    });
+
+    const form = el('form', {},
+      el('h2', {}, 'Report or rate this video'),
+      status,
+      el('fieldset', {}, el('legend', {}, 'What is AI-generated?'), ...typeBoxes.map(([, label]) => label)),
+      el('fieldset', {}, el('legend', {}, 'How much?'), ...levelBoxes.map(([, label]) => label)),
+      actions, msg);
+    form.addEventListener('submit', (e) => e.preventDefault());
+    const veil = el('div', { className: 'veil' }, form);
+    veil.addEventListener('mousedown', (e) => { if (e.target === veil) closeReport(); });
+    veil.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeReport(); e.stopPropagation(); });
+    root.append(el('style', {}, DIALOG_CSS), veil);
+    document.documentElement.append(host);
+    (signedIn ? typeBoxes[0][0] : signIn).focus();
+  }
+
   browser.runtime.onMessage.addListener((msg) => {
+    if (msg?.type === 'report-open') {
+      openReport(msg);
+      return undefined;
+    }
     if (msg?.type === 'ctx') {
       return Promise.resolve({
         item: contextItem(),
@@ -258,7 +375,7 @@
       const count = (kind) => document.querySelectorAll(`[data-invslop="${kind}"]`).length;
       return Promise.resolve({
         site: isYouTube ? 'YouTube' : 'Invidious',
-        block: count('block'), warn: count('warn'), ai: count('ai'),
+        block: count('block'), svc: count('svc'), warn: count('warn'), ai: count('ai'),
         hidden: document.querySelectorAll('[data-invslop-action="hide"]').length,
         reveal: document.documentElement.hasAttribute('data-invslop-reveal'),
       });
