@@ -44,6 +44,16 @@ nothing to match against, on YouTube only the AI label and link-less cards (e.g.
 - Channel cards in search results (only video cards are handled).
 - Flagged watch pages get a banner; the video is not prevented from playing.
 
+## How it was built
+
+InvidioSlop was co-coded with Claude Fable 5.2, Anthropic's AI model, working in Claude Code. The
+maintainer set the requirements, made the design and release decisions and tested the result; Fable
+wrote the code and checked it in a real Firefox against YouTube and a live Invidious instance.
+
+That is not the kind of AI use this extension targets. It filters mass-produced video content made
+to fill feeds, not software written with AI assistance and reviewed by a person. Bug reports and
+corrections are welcome either way.
+
 ## License
 
 Code: [GPL-3.0](LICENSE). The AiSList data it downloads at runtime is CC BY-NC 4.0 and belongs to its contributors.
