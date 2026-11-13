@@ -1,0 +1,15 @@
+{
+  "slug": "invidioslop",
+  "summary": {
+    "en-US": "Hides or marks AI slop on YouTube and any Invidious instance, using the community AiSList channel lists and YouTube's own \"altered or synthetic content\" label."
+  },
+  "categories": {
+    "firefox": ["photos-music-videos"]
+  },
+  "homepage": {
+    "en-US": "https://github.com/tikaydaes/invidioslop"
+  },
+  "version": {
+    "license": "GPL-3.0-only"
+  }
+}

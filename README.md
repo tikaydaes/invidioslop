@@ -13,10 +13,14 @@ allow/block lists, a "show hidden videos on this page" toggle and a manual list 
 
 ## Install
 
-- **Signed build:** download the `.xpi` from the repository's Releases page and open it in Firefox.
+- **From Mozilla:** https://addons.mozilla.org/firefox/addon/invidioslop/
 - **From source (temporary):** `about:debugging` → This Firefox → Load Temporary Add-on → pick `manifest.json`.
-- **Signing your own build:** `npx web-ext sign --channel=unlisted` with addons.mozilla.org API keys
-  (bump `version` in `manifest.json` first; change the add-on ID if you are not the original owner).
+
+## Releasing
+
+Bump `version` in `manifest.json`, commit, then push a matching tag (`git tag v0.1.2 && git push --tags`).
+The Release workflow lints the extension, submits it to addons.mozilla.org as a listed version and creates
+a GitHub release. It needs the `AMO_JWT_ISSUER` and `AMO_JWT_SECRET` repository secrets.
 
 ## How it works
 
