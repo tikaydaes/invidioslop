@@ -280,6 +280,8 @@
 
   function describeState(state) {
     if (!state || state.status === 'unknown') return 'Nobody has reported this video yet.';
+    // The service withholds counts on undecided videos until you have voted.
+    if (state.counts_hidden) return 'Reported, not settled yet.';
     const votes = `${state.n_yes} say slop, ${state.n_no} say not`;
     if (state.status === 'confirmed') return `Listed as AI slop (${votes}).`;
     if (state.status === 'rejected') return `Reviewed and not listed (${votes}).`;
