@@ -230,7 +230,30 @@
     resetAll();
   });
 
+  // --------------------------------------------- right-click menu support
+  // The background script builds the menu; it asks us what was right-clicked.
+  let lastTarget = null;
+  document.addEventListener('contextmenu', (e) => { lastTarget = e.target; }, true);
+
+  function contextItem() {
+    for (let el = lastTarget; el && el.nodeType === 1; el = el.parentElement) {
+      const st = state.get(el);
+      if (st) return st.item;
+    }
+    // Not on a card: fall back to the video or channel this page is about.
+    const u = new URL(location.href);
+    const v = videoIdOf(u);
+    return v ? { v } : channelOf(u);
+  }
+
   browser.runtime.onMessage.addListener((msg) => {
+    if (msg?.type === 'ctx') {
+      return Promise.resolve({
+        item: contextItem(),
+        hidden: document.querySelectorAll('[data-invslop-action="hide"]').length,
+        reveal: document.documentElement.hasAttribute('data-invslop-reveal'),
+      });
+    }
     if (msg?.type === 'page-info') {
       const count = (kind) => document.querySelectorAll(`[data-invslop="${kind}"]`).length;
       return Promise.resolve({

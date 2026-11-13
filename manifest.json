@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "InvidioSlop",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Hides or marks AI slop on YouTube and Invidious using the community AiSList and YouTube's own AI-content label.",
   "icons": {
     "48": "icons/icon-48.png",
@@ -24,7 +24,9 @@
     "unlimitedStorage",
     "alarms",
     "webRequest",
-    "webRequestBlocking"
+    "webRequestBlocking",
+    "menus",
+    "clipboardWrite"
   ],
   "host_permissions": [
     "<all_urls>"

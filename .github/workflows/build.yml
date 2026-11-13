@@ -1,0 +1,35 @@
+# Lints every push and pull request and publishes an unsigned build.
+# Download the "invidioslop-<version>-unsigned" artifact from the run page: the
+# downloaded zip is the extension itself and can be loaded as-is via
+# about:debugging → This Firefox → Load Temporary Add-on.
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Lint
+        run: npx --yes web-ext@10 lint
+
+      - name: Build
+        id: build
+        run: |
+          version=$(jq -r .version manifest.json)
+          npx --yes web-ext@10 build --artifacts-dir out --filename "invidioslop-$version-unsigned.zip"
+          # Upload the unpacked files: GitHub zips artifacts itself, so this
+          # avoids a zip inside a zip and keeps manifest.json at the top level.
+          unzip -q "out/invidioslop-$version-unsigned.zip" -d unpacked
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: invidioslop-${{ steps.build.outputs.version }}-unsigned
+          path: unpacked/
+          if-no-files-found: error

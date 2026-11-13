@@ -78,8 +78,8 @@ function ensureAlarms() {
   browser.alarms.create('prune', { periodInMinutes: 24 * 60, delayInMinutes: 30 });
 }
 
-browser.runtime.onInstalled.addListener(() => { ensureAlarms(); syncLists(true); });
-browser.runtime.onStartup.addListener(() => { ensureAlarms(); syncLists(false); });
+browser.runtime.onInstalled.addListener(() => { ensureAlarms(); createMenus(); syncLists(true); });
+browser.runtime.onStartup.addListener(() => { ensureAlarms(); createMenus(); syncLists(false); });
 browser.alarms.onAlarm.addListener((a) => {
   if (a.name === 'sync') syncLists(false);
   if (a.name === 'prune') pruneCache();
@@ -304,6 +304,125 @@ async function evaluate(item, allowNet) {
   if (lv === 'warn' && st.warn !== 'off') return { s: 'warn', why: `${who} is on the AiSList warnlist (likely AI content)`, pending };
   return { s: '', why: '', pending };
 }
+
+// ------------------------------------------------------ right-click menu
+
+const MENU_CONTEXTS = ['page', 'link', 'image', 'video', 'selection'];
+const MENU_IDS = ['slop-block', 'slop-copy', 'slop-sep', 'slop-reveal'];
+
+function createMenus() {
+  browser.menus.removeAll().then(() => {
+    const base = { contexts: MENU_CONTEXTS, visible: false };
+    browser.menus.create({ ...base, id: 'slop-block', title: 'Block this channel' });
+    browser.menus.create({ ...base, id: 'slop-copy', title: 'Copy channel handle' });
+    browser.menus.create({ ...base, id: 'slop-sep', type: 'separator' });
+    browser.menus.create({ ...base, id: 'slop-reveal', title: 'Show hidden videos on this page' });
+  });
+}
+
+// Best known identity of the channel behind an item: { h: '@handle', uc: 'UC…' }.
+async function identify(item, allowNet) {
+  const v = /^[\w-]{11}$/.test(item?.v || '') ? item.v : '';
+  let uc = /^UC[\w-]{22}$/.test(item?.uc || '') ? item.uc : '';
+  let h = slopNormHandle(item?.h);
+  const fill = async () => {
+    await cacheLoad([v && 'v:' + v]);
+    const vc = v && mem.get('v:' + v);
+    if (vc) { h ||= vc.h; uc ||= vc.uc; }
+    await cacheLoad([uc && 'c:' + uc]);
+    if (!h && uc) h = mem.get('c:' + uc)?.h || '';
+  };
+  await fill();
+  if (!h && allowNet && (uc || v) && (await getSettings()).net) {
+    try {
+      if (uc) await netChannel(uc); else await netVideo(v);
+    } catch (e) { console.warn('[InvidioSlop]', e.message || e); }
+    await fill();
+  }
+  return { h, uc };
+}
+
+// Is this channel currently treated as blocked, and through which lists?
+function blockState(id, st, userAllow, userExtra, lists) {
+  const has = (set) => !!((id.h && set.has(id.h)) || (id.uc && set.has(id.uc)));
+  const onList = has(lists.block) || (has(lists.warn) && st.warn !== 'off');
+  return { has, onList, blocked: !has(userAllow) && (has(userExtra) || onList) };
+}
+
+// "Block" adds the channel to the user's own block list; "Unblock" removes it
+// from there and, if AiSList is what flags it, adds it to the never-flag list.
+async function toggleBlock(item) {
+  const id = await identify(item, true);
+  const key = id.h || id.uc;
+  if (!key) return;
+  const [st, lists] = await Promise.all([slopGetSettings(), getLists()]);
+  const allow = new Set(slopParseList(st.allow));
+  const extra = new Set(slopParseList(st.extra));
+  const { has, onList, blocked } = blockState(id, st, allow, extra, lists);
+  const drop = (set) => { set.delete(id.h); set.delete(id.uc); };
+  if (blocked) {
+    drop(extra);
+    if (onList) allow.add(key);
+  } else {
+    drop(allow);
+    if (!has(lists.block)) extra.add(key);
+  }
+  await browser.storage.local.set({
+    settings: { ...st, allow: [...allow].join('\n'), extra: [...extra].join('\n') },
+  });
+}
+
+async function askTab(tabId) {
+  try { return (await browser.tabs.sendMessage(tabId, { type: 'ctx' }, { frameId: 0 })) || null; } catch { return null; }
+}
+
+let menuSeq = 0;
+
+browser.menus.onShown.addListener(async (info, tab) => {
+  const seq = ++menuSeq;
+  const ctx = tab?.id != null ? await askTab(tab.id) : null;
+  let updates;
+  if (!ctx) {
+    updates = MENU_IDS.map((id) => [id, { visible: false }]);
+  } else {
+    let id = { h: '', uc: '' };
+    let blocked = false;
+    if (ctx.item) {
+      const [st, lists] = await Promise.all([getSettings(), getLists()]);
+      id = await identify(ctx.item, false);
+      blocked = blockState(id, st, lists.allow, lists.extra, lists).blocked;
+    }
+    const who = id.h || 'this channel';
+    updates = [
+      ['slop-block', { visible: !!ctx.item, title: `${blocked ? 'Unblock' : 'Block'} ${who}` }],
+      ['slop-copy', { visible: !!ctx.item, title: id.h ? `Copy handle ${id.h}` : 'Copy channel handle' }],
+      ['slop-sep', { visible: !!ctx.item }],
+      ['slop-reveal', {
+        visible: true,
+        title: ctx.reveal ? 'Hide flagged videos again' : `Show hidden videos on this page (${ctx.hidden})`,
+      }],
+    ];
+  }
+  if (seq !== menuSeq) return; // menu was closed or reopened while we were working
+  await Promise.all(updates.map(([id, props]) => browser.menus.update(id, props)));
+  if (seq === menuSeq) browser.menus.refresh();
+});
+
+browser.menus.onHidden.addListener(() => { menuSeq++; });
+
+browser.menus.onClicked.addListener(async (info, tab) => {
+  if (tab?.id == null) return;
+  const ctx = await askTab(tab.id);
+  if (!ctx) return;
+  if (info.menuItemId === 'slop-reveal') {
+    browser.tabs.sendMessage(tab.id, { type: 'reveal', on: !ctx.reveal }, { frameId: 0 }).catch(() => {});
+  } else if (info.menuItemId === 'slop-block' && ctx.item) {
+    await toggleBlock(ctx.item);
+  } else if (info.menuItemId === 'slop-copy' && ctx.item) {
+    const { h } = await identify(ctx.item, true);
+    if (h) await navigator.clipboard.writeText(h);
+  }
+});
 
 // ---------------------------------------------------------------- messages
 

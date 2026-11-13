@@ -11,9 +11,18 @@ A video is flagged when:
 Each of the three can be set to Hide, Mark or Ignore from the toolbar popup, which also has your own
 allow/block lists, a "show hidden videos on this page" toggle and a manual list sync.
 
+Right-clicking a video (or anywhere on a watch or channel page) adds an InvidioSlop menu:
+
+- **Block / Unblock @channel** — adds the channel to your own block list, or lifts a block. Unblocking a
+  channel that AiSList flags puts it on your never-flag list. Everything stays local to your browser.
+- **Copy handle** — copies the channel's `@handle`.
+- **Show hidden videos on this page** — toggles hidden videos on and off.
+
 ## Install
 
 - **From Mozilla:** https://addons.mozilla.org/firefox/addon/invidioslop/
+- **Unsigned build (temporary):** every push builds an `invidioslop-<version>-unsigned` artifact (Actions → Build),
+  and each release has the same zip attached. Load it via `about:debugging` → This Firefox → Load Temporary Add-on.
 - **From source (temporary):** `about:debugging` → This Firefox → Load Temporary Add-on → pick `manifest.json`.
 
 ## Releasing
